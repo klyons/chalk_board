@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: chalkboard-relay
+    runtime: node
+    buildCommand: cd server && npm install
+    startCommand: cd server && node server.js
+    envVars:
+      - key: PORT
+        value: 10000
