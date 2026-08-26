@@ -1,0 +1,8 @@
+{
+  "name": "chalk_board",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "bash scripts/vercel-build.sh"
+  }
+}
