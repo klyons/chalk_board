@@ -43,6 +43,7 @@ dependencies:
   shelf: ^1.4.2
   shelf_web_socket: ^3.0.0
   shelf_router: ^1.1.4
+  supabase_flutter: ^2.17.2
 
 dev_dependencies:
   flutter_test:

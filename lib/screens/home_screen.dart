@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import '../config/supabase_config.dart';
 import '../services/local_server_service.dart';
 import 'board_screen.dart';
 
@@ -16,9 +17,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _roomCodeController = TextEditingController();
   final TextEditingController _ipController = TextEditingController();
   final TextEditingController _serverUrlController = TextEditingController();
+  final TextEditingController _supabaseUrlController = TextEditingController();
+  final TextEditingController _supabaseKeyController = TextEditingController();
 
   late final String _userId;
   String _serverUrl = 'ws://127.0.0.1:8080/ws';
+  String _supabaseUrl = SupabaseConfig.supabaseUrl;
+  String _supabaseKey = SupabaseConfig.supabaseAnonKey;
+  bool _useSupabase = SupabaseConfig.isConfigured;
+
   LocalServerService? _localServerService;
   bool _isStartingLocalHost = false;
 
@@ -29,6 +36,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final randomNum = Random().nextInt(900) + 100;
     _nameController.text = 'Doodler $randomNum';
     _serverUrlController.text = _serverUrl;
+    _supabaseUrlController.text = _supabaseUrl;
+    _supabaseKeyController.text = _supabaseKey;
   }
 
   @override
@@ -37,6 +46,8 @@ class _HomeScreenState extends State<HomeScreen> {
     _roomCodeController.dispose();
     _ipController.dispose();
     _serverUrlController.dispose();
+    _supabaseUrlController.dispose();
+    _supabaseKeyController.dispose();
     _localServerService?.dispose();
     super.dispose();
   }
@@ -61,6 +72,9 @@ class _HomeScreenState extends State<HomeScreen> {
           userName: name,
           serverUrl: serverUrl,
           localServer: serverService,
+          useSupabase: _useSupabase && serverService == null,
+          supabaseUrl: _supabaseUrl,
+          supabaseAnonKey: _supabaseKey,
         ),
       ),
     );
@@ -181,47 +195,107 @@ class _HomeScreenState extends State<HomeScreen> {
   void _showSettingsDialog() {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1E232A),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Server Settings', style: TextStyle(color: Colors.white, fontSize: 18)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'WebSocket Relay Server URL:',
-              style: TextStyle(color: Colors.white70, fontSize: 13),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          backgroundColor: const Color(0xFF1E232A),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          title: const Row(
+            children: [
+              Icon(Icons.cloud_sync_rounded, color: Color(0xFF81C784)),
+              SizedBox(width: 10),
+              Text('Cloud & Server Settings', style: TextStyle(color: Colors.white, fontSize: 18)),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Use Supabase Realtime', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                  subtitle: const Text('Zero server maintenance, global cloud sync', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                  value: _useSupabase,
+                  activeTrackColor: const Color(0xFF2E7D32),
+                  activeThumbColor: const Color(0xFF81C784),
+                  onChanged: (val) {
+                    setDialogState(() => _useSupabase = val);
+                    setState(() => _useSupabase = val);
+                  },
+                ),
+                const SizedBox(height: 10),
+                if (_useSupabase) ...[
+                  const Text('Supabase Project URL:', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _supabaseUrlController,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'https://xyzcompany.supabase.co',
+                      hintStyle: const TextStyle(color: Colors.white30),
+                      filled: true,
+                      fillColor: Colors.white.withValues(alpha: 0.06),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text('Supabase Anon (Public) Key:', style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _supabaseKeyController,
+                    obscureText: true,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+                      hintStyle: const TextStyle(color: Colors.white30),
+                      filled: true,
+                      fillColor: Colors.white.withValues(alpha: 0.06),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ] else ...[
+                  const Text('Custom WebSocket Relay URL:', style: TextStyle(color: Colors.white70, fontSize: 12)),
+                  const SizedBox(height: 6),
+                  TextField(
+                    controller: _serverUrlController,
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
+                    decoration: InputDecoration(
+                      hintText: 'ws://... or wss://...',
+                      hintStyle: const TextStyle(color: Colors.white30),
+                      filled: true,
+                      fillColor: Colors.white.withValues(alpha: 0.06),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ],
             ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _serverUrlController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'ws://your-server:8080/ws or wss://...',
-                hintStyle: const TextStyle(color: Colors.white30),
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.06),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2E7D32),
+                foregroundColor: Colors.white,
               ),
+              onPressed: () {
+                setState(() {
+                  _serverUrl = _serverUrlController.text.trim();
+                  _supabaseUrl = _supabaseUrlController.text.trim();
+                  _supabaseKey = _supabaseKeyController.text.trim();
+                });
+                Navigator.of(ctx).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Settings saved!'), backgroundColor: Color(0xFF2E7D32)),
+                );
+              },
+              child: const Text('Save'),
             ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              setState(() {
-                _serverUrl = _serverUrlController.text.trim();
-              });
-              Navigator.of(ctx).pop();
-            },
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
   }
@@ -236,7 +310,7 @@ class _HomeScreenState extends State<HomeScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined, color: Colors.white70),
-            tooltip: 'Server Settings',
+            tooltip: 'Server & Supabase Settings',
             onPressed: _showSettingsDialog,
           ),
         ],
@@ -292,7 +366,31 @@ class _HomeScreenState extends State<HomeScreen> {
                       fontSize: 14,
                     ),
                   ),
-                  const SizedBox(height: 28),
+
+                  if (_useSupabase) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2E7D32).withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: const Color(0xFF81C784).withValues(alpha: 0.4)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.bolt_rounded, color: Color(0xFF81C784), size: 15),
+                          SizedBox(width: 4),
+                          Text(
+                            'Supabase Realtime Active',
+                            style: TextStyle(color: Color(0xFF81C784), fontSize: 11, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+
+                  const SizedBox(height: 24),
 
                   // Display Name Input Box
                   Container(
@@ -313,9 +411,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
 
-                  // Action Button 1: Create New Room (Cloud / Internet)
+                  // Action Button 1: Create New Room
                   SizedBox(
                     width: double.infinity,
                     height: 54,

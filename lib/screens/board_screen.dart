@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../config/supabase_config.dart';
 import '../services/drawing_service.dart';
 import '../services/network_service.dart';
+import '../services/supabase_network_service.dart';
 import '../services/local_server_service.dart';
 import '../widgets/drawing_canvas.dart';
 import '../widgets/toolbar.dart';
@@ -14,6 +16,9 @@ class BoardScreen extends StatefulWidget {
   final String userName;
   final String serverUrl;
   final LocalServerService? localServer;
+  final bool useSupabase;
+  final String? supabaseUrl;
+  final String? supabaseAnonKey;
 
   const BoardScreen({
     super.key,
@@ -22,6 +27,9 @@ class BoardScreen extends StatefulWidget {
     required this.userName,
     required this.serverUrl,
     this.localServer,
+    this.useSupabase = false,
+    this.supabaseUrl,
+    this.supabaseAnonKey,
   });
 
   @override
@@ -42,13 +50,29 @@ class _BoardScreenState extends State<BoardScreen> {
       currentUserName: widget.userName,
     );
 
-    _networkService = NetworkService(
-      serverUrl: widget.serverUrl,
-      roomId: widget.roomId,
-      userId: widget.userId,
-      userName: widget.userName,
-      drawingService: _drawingService,
-    );
+    final sUrl = widget.supabaseUrl ?? SupabaseConfig.supabaseUrl;
+    final sKey = widget.supabaseAnonKey ?? SupabaseConfig.supabaseAnonKey;
+    final isSupabaseActive = widget.useSupabase ||
+        (SupabaseConfig.isConfigured && widget.localServer == null && !widget.serverUrl.startsWith('ws://192.') && !widget.serverUrl.startsWith('ws://10.'));
+
+    if (isSupabaseActive && sUrl.isNotEmpty && sKey.isNotEmpty) {
+      _networkService = SupabaseNetworkService(
+        supabaseUrl: sUrl,
+        supabaseAnonKey: sKey,
+        roomId: widget.roomId,
+        userId: widget.userId,
+        userName: widget.userName,
+        drawingService: _drawingService,
+      );
+    } else {
+      _networkService = NetworkService(
+        serverUrl: widget.serverUrl,
+        roomId: widget.roomId,
+        userId: widget.userId,
+        userName: widget.userName,
+        drawingService: _drawingService,
+      );
+    }
 
     _notificationSub = _networkService.notifications.listen((message) {
       if (mounted) {
@@ -65,7 +89,7 @@ class _BoardScreenState extends State<BoardScreen> {
       }
     });
 
-    // Start WebSocket connection
+    // Start connection
     _networkService.connect();
   }
 
@@ -82,7 +106,7 @@ class _BoardScreenState extends State<BoardScreen> {
       context: context,
       builder: (ctx) => RoomInfoDialog(
         roomId: widget.roomId,
-        serverUrl: widget.serverUrl,
+        serverUrl: _networkService is SupabaseNetworkService ? 'Supabase Realtime Cloud' : widget.serverUrl,
         peerCount: _networkService.peerCount,
         localIp: widget.localServer?.localIp,
       ),
